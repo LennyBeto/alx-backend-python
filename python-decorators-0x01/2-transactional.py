@@ -1,35 +1,30 @@
 import sqlite3
 import functools
 
+# Decorator to manage DB connection and pass it to the function
 def with_db_connection(func):
-    """Decorator to handle database connection."""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        # Open a database connection
-        conn = sqlite3.connect('users.db')
+        conn = sqlite3.connect("users.db")
         try:
-            # Call the original function with the connection
-            return func(conn, *args, **kwargs)
+            result = func(conn, *args, **kwargs)
         finally:
-            # Ensure the connection is closed after the function call
             conn.close()
+        return result
     return wrapper
 
+# Decorator to wrap DB operations in a transaction
 def transactional(func):
-    """Decorator to manage database transactions."""
     @functools.wraps(func)
     def wrapper(conn, *args, **kwargs):
         try:
-            # Execute the original function
             result = func(conn, *args, **kwargs)
-            # Commit the transaction if successful
-            conn.commit()
+            conn.commit()  # commit if no error
             return result
         except Exception as e:
-            # Rollback the transaction in case of an error
-            conn.rollback()
-            print(f"Transaction failed: {e}")
-            raise  # Re-raise the exception for further handling
+            conn.rollback()  # rollback if error
+            print(f"[ERROR] Transaction rolled back due to: {e}")
+            raise  # re-raise the error after rollback
     return wrapper
 
 @with_db_connection
@@ -38,5 +33,5 @@ def update_user_email(conn, user_id, new_email):
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET email = ? WHERE id = ?", (new_email, user_id))
 
-#### Update user's email with automatic transaction handling
+# Update user's email with automatic connection and transaction handling
 update_user_email(user_id=1, new_email='Crawford_Cartwright@hotmail.com')
