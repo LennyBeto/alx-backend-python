@@ -15,6 +15,7 @@ from django.shortcuts import get_object_or_404
 
 from .models import Conversation, Message, User
 from .serializers import ConversationSerializer, MessageSerializer, UserSerializer
+from .permissions import IsParticipant # Import your custom permission
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
@@ -28,14 +29,16 @@ class ConversationViewSet(viewsets.ModelViewSet):
     """
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsParticipant] # Use your custom permission
 
     def get_queryset(self):
         """
         Filters conversations to only show those the authenticated user is a participant of.
         """
         user = self.request.user
-        return Conversation.objects.filter(participants=user).distinct()
+        if user.is_authenticated:
+            return Conversation.objects.filter(participants=user).distinct()
+        return Conversation.objects.none() # No conversations for unauthenticated users
 
     def create(self, request, *args, **kwargs):
         """
@@ -45,6 +48,12 @@ class ConversationViewSet(viewsets.ModelViewSet):
         of user IDs to include in the conversation. The authenticated user
         is automatically added as a participant.
         """
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication credentials were not provided."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
         participant_ids = request.data.get('participant_ids', [])
         if not isinstance(participant_ids, list):
             return Response(
@@ -80,47 +89,3 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 
 class MessageViewSet(viewsets.ModelViewSet):
-    """
-    A ViewSet for viewing and editing Message instances.
-
-    Provides actions for:
-    - Listing messages within a specific conversation.
-    - Sending a new message to a specific conversation.
-    """
-    queryset = Message.objects.all()
-    serializer_class = MessageSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        """
-        Filters messages to only show those belonging to a specific conversation
-        and where the authenticated user is a participant.
-        """
-        conversation_id = self.kwargs.get('conversation_pk')
-        if conversation_id:
-            # Ensure the user is a participant of this conversation
-            conversation = get_object_or_404(
-                Conversation,
-                conversation_id=conversation_id,
-                participants=self.request.user
-            )
-            return Message.objects.filter(conversation=conversation).order_by('sent_at')
-        return Message.objects.none() # Return empty queryset if no conversation_id
-
-    def perform_create(self, serializer):
-        """
-        Sets the sender of the message to the authenticated user and links it
-        to the specified conversation.
-        """
-        conversation_id = self.kwargs.get('conversation_pk')
-        if not conversation_id:
-            raise serializers.ValidationError("Conversation ID is required to send a message.")
-
-        # Ensure the user is a participant of this conversation
-        conversation = get_object_or_404(
-            Conversation,
-            conversation_id=conversation_id,
-            participants=self.request.user
-        )
-        serializer.save(sender=self.request.user, conversation=conversation)
-
