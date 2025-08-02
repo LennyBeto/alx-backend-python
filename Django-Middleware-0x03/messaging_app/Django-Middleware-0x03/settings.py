@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-=+%07b*v7do3m7pr=nif-aweyp-l3e*xu+g2i+t**@#n!13da#'
+SECRET_KEY = 'django-insecure-uripe8lqxfhqu7__je531=q&7g&a(6o2%uya$(zx#ig=dr3wx7'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -38,94 +37,53 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
     'rest_framework',
-    'drf_yasg',
-    'corsheaders',
-    'chats',
+    'rest_framework_simplejwt',
     'django_filters',
+    'chats',
 ]
 
+# Pagination settings
+PAGE_SIZE = 20  # Default number of items per page
+
+DEFAULT_PAGINATION_CLASS = 'rest_framework.pagination.PageNumberPagination'  # Default pagination class
+
+
+# Django REST Framework configuration
+REST_FRAMEWORK = {
+    # Default permission for all views (can override per-view)
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+
+    # Default authentication mechanisms
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+        # Later we can add TokenAuthentication or JWT
+        'rest_framework_simplejwt.authentication.JWTAuthentication'
+    ],
+
+    # Optional: default renderers (JSON + Browsable API)
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+}
+
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'chats.middleware.RequestLoggingMiddleware',
-    'chats.middleware.RestrictAccessByTimeMiddleware',
-    'chats.middleware.RateLimitByIPMiddleware',
-    'chats.middleware.OffensiveLanguageMiddleware',
-    'chats.middleware.RolePermissionMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'chats.middleware.RequestLoggingMiddleware',
+    'chats.middleware.RestrictAccessByTimeMiddleware',
+    'chats.middleware.OffensiveLanguageMiddleware',
+    'chats.middleware.RolePermissionMiddleware',
 ]
-
-CORS_ALLOW_ALL_ORIGINS = True
-
-REST_FRAMEWORK = {
-    # Authentication classes
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.BasicAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
-    ],
-    
-    # Permission classes
-    'DEFAULT_PERMISSION_CLASSES': [
-        'chats.permissions.IsParticipantOfConversation',
-    ],
-    
-    # Renderer classes
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
-    ],
-    
-    # Parser classes
-    'DEFAULT_PARSER_CLASSES': [
-        'rest_framework.parsers.JSONParser',
-        'rest_framework.parsers.FormParser',
-        'rest_framework.parsers.MultiPartParser',
-    ],
-    
-    # Pagination
-    'DEFAULT_PAGINATION_CLASS': 'chats.pagination.StandardResultsSetPagination',
-    'PAGE_SIZE': 20,
-    
-    # Filter backends
-    'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
-        'rest_framework.filters.OrderingFilter',
-    ],
-    
-    # Throttling (optional - for rate limiting)
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
-    ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour'
-    },
-    
-    # Exception handling
-    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
-    
-    # API versioning (optional)
-    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
-    'DEFAULT_VERSION': 'v1',
-    'ALLOWED_VERSIONS': ['v1'],
-    
-    # Content negotiation
-    'DEFAULT_CONTENT_NEGOTIATION_CLASS': 'rest_framework.negotiation.DefaultContentNegotiation',
-    
-    # Metadata
-    'DEFAULT_METADATA_CLASS': 'rest_framework.metadata.SimpleMetadata',
-}
-
 
 ROOT_URLCONF = 'messaging_app.urls'
 
@@ -176,8 +134,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-AUTH_USER_MODEL = 'chats.User'
-
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
@@ -201,13 +157,10 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+AUTH_USER_MODEL = 'chats.User'
 
 SIMPLE_JWT = {
-    'USER_ID_FIELD': 'user_id',  # ✅ matches your primary key field
-    'USER_ID_CLAIM': 'user_id',  # ✅ what will be included in the JWT payload
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': True,
+    'USER_ID_FIELD': 'user_id',
     'AUTH_HEADER_TYPES': ('Bearer',),
+    # Other configurations for Simple JWT
 }
