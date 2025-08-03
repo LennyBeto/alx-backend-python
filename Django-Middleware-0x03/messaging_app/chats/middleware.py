@@ -1,128 +1,114 @@
-# chats/middleware.py
-from datetime import datetime, time
-from django.http import HttpResponseForbidden
 import logging
 from datetime import datetime
-from collections import defaultdict, deque
-from threading import Lock
+from django.http import JsonResponse
+from django.core.cache import cache
+from time import time
 
-# Configure the logger
-logger = logging.getLogger(__name__)
+# Setting up logging configuration
+logger = logging.getLogger('request_logger')
+logger.setLevel(logging.INFO)
 file_handler = logging.FileHandler('requests.log')
-formatter = logging.Formatter('%(message)s')
+formatter = logging.Formatter('%(message)s')  # Custom log format
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
-logger.setLevel(logging.INFO)
 
 class RequestLoggingMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        user = request.user if request.user.is_authenticated else 'Anonymous'
-        log_entry = f"{datetime.now()} - User: {user} - Path: {request.path}"
-        logger.info(log_entry)
+        # Ensure 'user' is always defined
+        user = 'Anonymous'  # Default to 'Anonymous'
+        if request.user.is_authenticated:
+            user = request.user.email
+        
+        # Log the details (timestamp, user, and request path)
+        log_message = f"{datetime.now()} - User: {user} - Path: {request.path}"
+        logger.info(log_message)
+
+        # Get the response and return it
         response = self.get_response(request)
         return response
-    
+
 class RestrictAccessByTimeMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # Define the access window: 6 PM to 9 PM
-        start_time = time(18, 0)  # 6:00 PM
-        end_time = time(21, 0)    # 9:00 PM
-        now = datetime.now().time()
+        # Get the current time
+        current_time = datetime.now().hour
 
-        # Allow only if current time is between 6 PM and 9 PM
-        if not (start_time <= now <= end_time):
-            return HttpResponseForbidden("Access to chat is allowed only between 6 PM and 9 PM.")
+        # Restrict access outside 9 PM to 6 PM
+        if current_time < 9 or current_time > 18:
+            return JsonResponse(
+                {"error": "Access to the chat is restricted between 9 PM and 6 PM."},
+                status=403
+            )
 
-        return self.get_response(request)
+        # Continue processing the request if it's within the allowed hours
+        response = self.get_response(request)
+        return response
 
-
-class RateLimitByIPMiddleware:
-    def __init__(self, get_response):
-        self.get_response = get_response
-        # Store message timestamps per IP
-        self.message_logs = defaultdict(deque)
-        self.limit = 5  # Max messages
-        self.window_seconds = 60  # 1 minute
-
-    def __call__(self, request):
-        # Apply rate-limiting only to POST requests to /api/messages/ or similar
-        if request.method == "POST" and "/messages" in request.path:
-            ip = self.get_client_ip(request)
-            now = time.time()
-
-            logs = self.message_logs[ip]
-
-            # Remove timestamps older than the window
-            while logs and now - logs[0] > self.window_seconds:
-                logs.popleft()
-
-            if len(logs) >= self.limit:
-                return HttpResponseForbidden("Rate limit exceeded: Max 5 messages per minute.")
-
-            logs.append(now)
-
-        return self.get_response(request)
-
-    def get_client_ip(self, request):
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(",")[0]
-        else:
-            ip = request.META.get("REMOTE_ADDR")
-        return ip
-    
-class RolePermissionMiddleware:
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        # Only check role-based access for unsafe methods
-        if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
-            user = getattr(request, "user", None)
-
-            if user and user.is_authenticated:
-                if user.role not in ["admin"]:  # You can add "moderator" if needed
-                    return HttpResponseForbidden("403 Forbidden: Insufficient role permissions.")
-            else:
-                return HttpResponseForbidden("403 Forbidden: Authentication required.")
-
-        return self.get_response(request)
-    
 class OffensiveLanguageMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-        self.request_log = defaultdict(list)  # {ip: [timestamps]}
-        self.lock = Lock()
-        self.limit = 5  # messages
-        self.window = 60  # seconds
 
     def __call__(self, request):
-        if request.method == 'POST' and request.path.startswith("/chats/"):
-            ip = self.get_client_ip(request)
-            now = time.time()
+        # Only track POST requests (messages)
+        if request.method == "POST" and request.path.startswith('/api/messages/'):
+            user_ip = self.get_client_ip(request)
+            cache_key = f"message_count_{user_ip}"
+            current_time = time()
 
-            with self.lock:
-                # Remove timestamps older than the window
-                self.request_log[ip] = [
-                    t for t in self.request_log[ip] if now - t < self.window
-                ]
+            # Get the existing message count and timestamp from the cache
+            message_data = cache.get(cache_key, {"count": 0, "timestamp": current_time})
 
-                if len(self.request_log[ip]) >= self.limit:
-                    return HttpResponseForbidden("403 Forbidden: Message rate limit exceeded (5 messages/minute).")
+            # Check if 1 minute has passed since the first message in the window
+            if current_time - message_data["timestamp"] > 60:
+                message_data = {"count": 0, "timestamp": current_time}
 
-                self.request_log[ip].append(now)
+            # Check the current message count
+            if message_data["count"] >= 5:
+                # If the user exceeded the message limit, return an error response
+                return JsonResponse(
+                    {"error": "You have exceeded the limit of 5 messages per minute."},
+                    status=403
+                )
 
-        return self.get_response(request)
+            # Increment the message count
+            message_data["count"] += 1
+            # Save the updated count back to the cache with a timeout of 1 minute
+            cache.set(cache_key, message_data, timeout=60)
+
+        # Proceed with the next middleware or view if within the limit
+        response = self.get_response(request)
+        return response
 
     def get_client_ip(self, request):
-        """ Get the client's IP address, considering reverse proxy headers if needed """
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+        """Get the IP address of the client"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
-            return x_forwarded_for.split(",")[0]
-        return request.META.get("REMOTE_A
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+class RolepermissionMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Only check user role for specific actions, e.g., POST requests to send a message
+        if request.method == "POST" and request.path.startswith('/api/messages/'):
+            user = request.user
+
+            # Check if the user is an admin or moderator
+            if not user.is_admin and not user.is_moderator:
+                return JsonResponse(
+                    {"error": "You do not have permission to perform this action."},
+                    status=403
+                )
+
+        # Proceed with the next middleware or view
+        response = self.get_response(request)
+        return response
