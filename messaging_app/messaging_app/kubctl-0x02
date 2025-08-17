@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# This script deploys a blue-green release, allowing for zero-downtime updates.
+# It deploys the new 'green' version alongside the current 'blue' version,
+# then checks the logs of the new version for errors.
+
+# 1. Apply the blue deployment (the current version)
+echo "--> Deploying the 'blue' version..."
+kubectl apply -f blue_deployment.yaml
+
+# Wait for the blue pods to be ready
+echo "--> Waiting for blue pods to become ready..."
+kubectl wait --for=condition=ready pod -l app=django-messaging-app,version=blue --timeout=300s
+
+# 2. Apply the green deployment (the new version)
+echo "--> Deploying the 'green' version (new version)..."
+kubectl apply -f green_deployment.yaml
+
+# Wait for the green pods to be ready
+echo "--> Waiting for green pods to become ready..."
+kubectl wait --for=condition=ready pod -l app=django-messaging-app,version=green --timeout=300s
+
+# 3. Apply the service, which is currently routing to the blue version
+echo "--> Applying the service, configured to route to the 'blue' version..."
+kubectl apply -f kubeservice.yaml
+
+# 4. Get the name of a green pod to check its logs for errors
+echo "--> Checking logs of the new 'green' version for errors..."
+GREEN_POD_NAME=$(kubectl get pods -l app=django-messaging-app,version=green -o jsonpath='{.items[0].metadata.name}')
+
+if [ -z "$GREEN_POD_NAME" ]; then
+  echo "Error: Could not find any green pods. Deployment may have failed."
+  exit 1
+fi
+
+kubectl logs $GREEN_POD_NAME
+
+echo "--> Deployment is complete. Traffic is still routed to the 'blue' version."
+echo "Once you are confident the 'green' version is stable, you can switch traffic."
+echo "To switch traffic, edit 'kubeservice.yaml' and change 'version: blue' to 'version: green',"
+echo "then run 'kubectl apply -f kubeservice.yaml'."
