@@ -1,0 +1,35 @@
+# ingress.yaml
+
+# This Ingress resource defines how external traffic should be routed
+# to the services within your Kubernetes cluster. It uses the Nginx Ingress
+# controller to manage this traffic.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: django-messaging-app-ingress
+  annotations:
+    # This annotation specifies that the Nginx Ingress controller should be used.
+    # It is crucial for the Ingress to work correctly with Nginx.
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  # The ingressClassName is a more modern way to specify the controller.
+  # This is the same as the annotation above but is the preferred method
+  # in Kubernetes versions 1.18 and later.
+  ingressClassName: nginx
+  rules:
+    # A single rule that routes traffic based on the path.
+    - http:
+        paths:
+          # This path rule routes all traffic starting with /api/
+          # to the specified backend service.
+          - path: /api
+            pathType: Prefix # The 'Prefix' type matches the URL path prefix.
+            backend:
+              service:
+                # The name of the service to which traffic will be sent.
+                # This should match the name in your deployment.yaml service definition.
+                name: django-messaging-app-service
+                port:
+                  # The port of the service to send traffic to.
+                  # This should be the service's port (80), not the container's (8000).
+                  number: 80

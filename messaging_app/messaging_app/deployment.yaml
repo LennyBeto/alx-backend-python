@@ -1,0 +1,63 @@
+# deployment.yaml
+
+# This section defines the Kubernetes Deployment for the Django application.
+# A Deployment manages a set of identical Pods, ensuring that a specified number
+# of replicas are always running.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-messaging-app
+  labels:
+    app: django-messaging-app
+spec:
+  replicas: 3 # You can adjust this number to scale your application.
+  selector:
+    matchLabels:
+      app: django-messaging-app
+  template:
+    metadata:
+      labels:
+        app: django-messaging-app
+    spec:
+      containers:
+        - name: django-messaging-app-container
+          # Replace 'your-dockerhub-username/your-django-image:latest' with your actual image name.
+          image: your-dockerhub-username/your-django-image:latest
+          ports:
+            - containerPort: 8000 # The default port for Django development server.
+          resources:
+            requests:
+              cpu: "100m" # Request 100 milli-CPUs
+              memory: "128Mi" # Request 128 mebibytes of memory
+            limits:
+              cpu: "500m" # Limit to 500 milli-CPUs
+              memory: "256Mi" # Limit to 256 mebibytes of memory
+          # A liveness probe checks if the container is still running.
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          # A readiness probe checks if the container is ready to accept traffic.
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+---
+# This section defines the Kubernetes Service for the Deployment.
+# A Service is an abstract way to expose an application running on a set of Pods
+# as a network service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-messaging-app-service
+spec:
+  selector:
+    app: django-messaging-app # This links the Service to the Deployment via the 'app' label.
+  ports:
+    - protocol: TCP
+      port: 80 # The port the Service will listen on.
+      targetPort: 8000 # The port the container is listening on.
+  type: ClusterIP # ClusterIP exposes the Service on a cluster-internal IP.
