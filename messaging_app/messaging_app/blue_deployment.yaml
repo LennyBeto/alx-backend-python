@@ -1,0 +1,51 @@
+# blue_deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-messaging-app-blue
+  labels:
+    app: django-messaging-app
+    version: blue
+spec:
+  # RollingUpdate strategy is the default, so it's not explicitly needed,
+  # but we include it for clarity.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1 # The number of pods that can be created above the desired number.
+      maxUnavailable: 1 # The number of pods that can be unavailable during the update.
+  replicas: 3
+  selector:
+    matchLabels:
+      app: django-messaging-app
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: django-messaging-app
+        version: blue
+    spec:
+      containers:
+      - name: django-messaging-app-container
+        # This is the new, updated version of your app.
+        image: your-dockerhub-username/your-django-image:2.0
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+        livenessProbe:
+          tcpSocket:
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          tcpSocket:
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
