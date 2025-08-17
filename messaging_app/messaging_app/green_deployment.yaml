@@ -1,0 +1,45 @@
+# green_deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-messaging-app-green
+  labels:
+    app: django-messaging-app
+    version: green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: django-messaging-app
+      version: green
+  template:
+    metadata:
+      labels:
+        app: django-messaging-app
+        version: green
+    spec:
+      containers:
+      - name: django-messaging-app-container
+        # This is the new, "green" version of your app.
+        # Be sure to use a different Docker image tag here.
+        image: your-dockerhub-username/your-django-image:v2.0
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+        livenessProbe:
+          tcpSocket:
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          tcpSocket:
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
