@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# This script performs a series of actions to scale and test a Kubernetes deployment.
+
+# Define the deployment name and the target number of replicas
+DEPLOYMENT_NAME="django-messaging-app"
+REPLICAS=3
+
+# A small delay function to give Kubernetes time to react
+function wait_for_pods {
+  echo "Waiting for pods to be ready..."
+  # The loop checks for a "Ready" state, not just creation
+  kubectl wait --for=condition=ready pod -l app=$DEPLOYMENT_NAME --timeout=300s
+}
+
+# 1. Check for required commands
+echo "--> Checking for required tools: kubectl and wrk..."
+command -v kubectl >/dev/null 2>&1 || { echo >&2 "kubectl is not installed. Aborting."; exit 1; }
+command -v wrk >/dev/null 2>&1 || { echo >&2 "wrk is not installed. Aborting."; exit 1; }
+
+# 2. Scale the deployment
+echo "--> Scaling deployment $DEPLOYMENT_NAME to $REPLICAS replicas..."
+kubectl scale deployment $DEPLOYMENT_NAME --replicas=$REPLICAS
+
+# Wait for the pods to become ready before proceeding
+wait_for_pods
+
+# 3. Verify that the pods are running
+echo "--> Verifying running pods..."
+kubectl get pods -l app=$DEPLOYMENT_NAME
+
+# Get the pod name to perform a port-forward and use wrk
+# This assumes you have at least one pod running.
+# The command below filters by the deployment's label and gets a single name.
+POD_NAME=$(kubectl get pods -l app=$DEPLOYMENT_NAME -o jsonpath='{.items[0].metadata.name}')
+
+if [ -z "$POD_NAME" ]; then
+  echo "Error: No pods found for the deployment. Load test cannot be performed."
+  exit 1
+fi
+
+echo "--> Found pod $POD_NAME. Setting up port-forward for load testing..."
+
+# Use a background process to port-forward from the cluster to localhost.
+# The `&` detaches the process, and `>/dev/null 2>&1` suppresses its output.
+kubectl port-forward $POD_NAME 8000:8000 >/dev/null 2>&1 &
+PORT_FORWARD_PID=$! # Store the PID of the port-forward process
+
+# A short pause to allow the port-forward to establish
+sleep 3
+
+# 4. Perform a basic load test using wrk
+echo "--> Starting a 30-second load test with 5 threads and 50 connections..."
+wrk -t5 -c50 -d30s "http://127.0.0.1:8000/"
+
+# Kill the background port-forward process
+kill $PORT_FORWARD_PID
+
+# 5. Monitor resource usage
+# Note: You need `kubectl top` to be configured, which often requires `metrics-server`.
+# Minikube typically includes this by default.
+echo "--> Monitoring resource usage of pods..."
+kubectl top pod -l app=$DEPLOYMENT_NAME
