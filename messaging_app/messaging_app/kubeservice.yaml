@@ -1,0 +1,18 @@
+# kubeservice.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-messaging-app-service
+spec:
+  # The 'selector' directs traffic to pods with matching labels.
+  # We start with 'version: blue' to direct all traffic to the current app.
+  # To switch, you would update this to 'version: green' and re-apply.
+  selector:
+    app: django-messaging-app
+    version: blue
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
