@@ -29,10 +29,10 @@ fi
 
 # 4. Verify the cluster is running
 echo "--> Verifying cluster info..."
-minikube kubectl -- cluster-info
+minikube kubectl cluster-info
 
 # 5. Retrieve all available pods (using -A to show all namespaces)
 echo "--> Retrieving all pods..."
-minikube kubectl -- get pods -A
+minikube kubectl get pods -A
 
 echo "--> Script finished successfully!"
