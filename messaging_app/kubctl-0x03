@@ -1,1 +1,65 @@
+#!/bin/bash
 
+# This script performs and monitors a zero-downtime rolling update.
+# It continuously sends curl requests to verify there is no interruption.
+
+# Define the deployment name and the service name
+DEPLOYMENT_NAME="django-messaging-app-blue"
+SERVICE_NAME="django-messaging-app-service"
+
+# Function to check if a command exists
+function command_exists {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# Check for required tools
+echo "--> Checking for required tools: kubectl and curl..."
+if ! command_exists kubectl; then
+  echo >&2 "kubectl is not installed. Aborting."
+  exit 1
+fi
+if ! command_exists curl; then
+  echo >&2 "curl is not installed. Aborting."
+  exit 1
+fi
+
+# 1. Apply the updated deployment file to trigger the rolling update
+echo "--> Applying the updated deployment file to start the rolling update..."
+kubectl apply -f blue_deployment.yaml
+
+# 2. Start a background process to port-forward the service
+echo "--> Starting port-forward to monitor for downtime..."
+kubectl port-forward service/$SERVICE_NAME 8000:80 >/dev/null 2>&1 &
+# Store the PID of the background port-forward process
+PORT_FORWARD_PID=$!
+
+# Give a few seconds for the port-forward to establish
+sleep 5
+
+# Start a background loop to continuously send curl requests
+# The loop will terminate when the main script finishes.
+while true; do
+  HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8000)
+  TIMESTAMP=$(date "+%H:%M:%S")
+  if [[ "$HTTP_STATUS" == "200" ]]; then
+    echo "[$TIMESTAMP] OK: HTTP status code $HTTP_STATUS"
+  else
+    echo "[$TIMESTAMP] FAILED: HTTP status code $HTTP_STATUS - Potential Downtime!"
+  fi
+  # Add a small delay between requests
+  sleep 1
+done &
+CURL_LOOP_PID=$!
+
+# 3. Monitor the update progress
+echo "--> Monitoring the rollout status of the deployment..."
+kubectl rollout status deployment/$DEPLOYMENT_NAME
+
+# Kill the background processes
+echo "--> Rolling update complete. Killing background processes."
+kill $PORT_FORWARD_PID
+kill $CURL_LOOP_PID
+
+# 4. Verify the Rolling Update is complete by checking the pods
+echo "--> Verifying new pods are running and old ones are terminated..."
+kubectl get pods -l app=django-messaging-app,version=blue
