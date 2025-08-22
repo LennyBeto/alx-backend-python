@@ -1,0 +1,71 @@
+pipeline {
+    agent any
+
+    tools {
+        python 'Python3'
+    }
+
+    environment {
+        GITHUB_CREDS = credentials('github-creds')
+        DOCKERHUB_CREDS = credentials('dockerhub-creds')
+        DOCKERHUB_REPO = 'https://github.com/lennybeto/alx-backend-python.git'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    credentialsId: 'github-creds',
+                    url: 'https://github.com/lennybeto/alx-backend-python.git'
+            }
+        }
+
+        stage('Install dependencies') {
+            steps {
+                sh '''
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip3 install --upgrade pip
+                    pip3 install -r messaging_app/requirements.txt
+                '''
+            }
+        }
+
+        stage('Run tests') {
+            steps {
+                sh '''
+                    . venv/bin/activate
+                    pytest --junitxml=messaging_app/pytest-report.xml
+                '''
+            }
+            post {
+                always {
+                    junit 'messaging_app/pytest-report.xml'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    docker build -t $DOCKERHUB_REPO:latest -f messaging_app/Dockerfile .
+                '''
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push $DOCKERHUB_REPO:latest
+                    '''
+                }
+            }
+        }
+    }
+
+    triggers {
+        // manual trigger only
+    }
+}

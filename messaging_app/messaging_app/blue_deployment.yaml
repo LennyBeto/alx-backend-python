@@ -27,25 +27,25 @@ spec:
         version: blue
     spec:
       containers:
-      - name: django-messaging-app-container
-        # This is the new, updated version of your app.
-        image: your-dockerhub-username/your-django-image:2.0
-        ports:
-        - containerPort: 8000
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "128Mi"
-          limits:
-            cpu: "500m"
-            memory: "256Mi"
-        livenessProbe:
-          tcpSocket:
-            port: 8000
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        readinessProbe:
-          tcpSocket:
-            port: 8000
-          initialDelaySeconds: 5
-          periodSeconds: 10
+        - name: django-messaging-app-container
+          # This is the new, updated version of your app.
+          image: your-dockerhub-username/your-django-image:2.0
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
