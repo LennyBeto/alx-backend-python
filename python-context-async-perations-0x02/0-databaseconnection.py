@@ -20,7 +20,7 @@ class DatabaseConnection:
             self.cursor.close()
         if self.conn:
             self.conn.close()
-        # Return False to propagate any exceptions, True to suppress them
+    
         return False  
 
 # Usage example
