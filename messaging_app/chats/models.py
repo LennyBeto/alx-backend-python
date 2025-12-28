@@ -71,7 +71,7 @@ class User(AbstractUser):
 
     class Meta:
         """
-        Meta options for the User model.
+        Meta options for the User model. 
         """
         verbose_name = "User"
         verbose_name_plural = "Users"
