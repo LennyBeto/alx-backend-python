@@ -61,5 +61,5 @@ class ConversationSerializer(serializers.ModelSerializer):
         fields = [
             'conversation_id', 'participants', 'messages', 'created_at'
         ]
-        read_only_fields = ['conversation_id', 'created_at']
+        read_only_fields = ['conversation_id', 'created_at'] 
 
