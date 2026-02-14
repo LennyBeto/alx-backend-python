@@ -1,6 +1,6 @@
-📦 Python Generators: Streaming SQL Data
+# Python Generators: Streaming SQL Data
 
-🧠 Objective
+## Objective
 Build a Python script that:
 
 Connects to a MySQL server
