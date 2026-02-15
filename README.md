@@ -3,7 +3,7 @@
 ## Objective
 Build a Python script that:
 
-Connects to a MySQL server
+Connects to a MySQL server 
 Creates a database ALX_prodev and a table user_data if they don't exist
 Inserts data from a CSV file (user_data.csv)
 Prepares for generator-based streaming of rows
