@@ -9,10 +9,13 @@ Inserts data from a CSV file (user_data.csv)
 Prepares for generator-based streaming of rows
 This is Project 0 in the advanced Python generators series.
 
-📁 Project Structure
-. ├── 0-main.py # Test script to drive seeding logic ├── seed.py # Main logic for DB creation and data seeding ├── user_data.csv # Input data (name, email, age) └── README.md # This documentation
+## Project Structure
+├── 0-main.py # Test script to drive seeding logic 
+├── seed.py # Main logic for DB creation and data seeding 
+├── user_data.csv # Input data (name, email, age) 
+└── README.md # This documentation
 
-🛠️ Setup Instructions
+## Setup Instructions
 Install MySQL if not already installed.
 
 Install Python MySQL Connector:
