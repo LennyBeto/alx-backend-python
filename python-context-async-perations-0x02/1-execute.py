@@ -5,7 +5,7 @@ class ExecuteQuery:
     A reusable context manager for executing parameterized SQL queries.
     Handles connection, execution, and cleanup automatically.
     """
-    
+
     def __init__(self, db_path='users.db', query=None, params=None):
         """
         Initialize the context manager.
